@@ -4,34 +4,44 @@ from app.login import carregar_login
 from app.dashboard import carregar_dashboard
 
 def main(page: ft.Page):
-    page.title = "Monitoramento de Contratos"
+    # 1. INICIALIZAÇÃO DO BANCO (Cria tabelas e o Admin p3dr0d4v1)
+    db.inicializar_db() 
+
+    # 2. CONFIGURAÇÕES DA PÁGINA
+    page.title = "Sistema de Gestão de Contratos - NoPaper"
     page.theme_mode = ft.ThemeMode.LIGHT
+    page.window_width = 1200
+    page.window_height = 800
     
-    # Configurações de Janela
-    page.window.width = 1200
-    page.window.height = 800
-
-    # Inicializa o Banco de Dados
-    db.init_db()
-
-    # Gerenciador de Rotas
+    # 3. GERENCIADOR DE ROTAS
     def route_change(route):
+        page.views.clear()
+        
         if page.route == "/":
             carregar_login(page)
+            
         elif page.route == "/dashboard":
+            # SEGURANÇA: Só permite acesso se houver usuário na sessão
+            if not page.session.get("user_name"):
+                page.go("/")
+                return
             carregar_dashboard(page)
+            
         page.update()
 
-    def view_pop(view):
-        page.views.pop()
-        top_view = page.views[-1]
-        page.go(top_view.route)
-
     page.on_route_change = route_change
-    page.on_view_pop = view_pop
     
-    # Inicia a aplicação
-    page.go("/")
+    # Garante que inicie na rota correta
+    if page.route == "/":
+        page.go("/")
+    else:
+        page.go(page.route)
 
 if __name__ == "__main__":
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+    # Mantendo a porta 8080 conforme sua preferência e configuração Docker
+    ft.app(
+        target=main, 
+        view=ft.AppView.WEB_BROWSER, 
+        port=8080,       
+        host="0.0.0.0"   
+    )

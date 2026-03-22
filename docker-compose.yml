@@ -1,10 +1,42 @@
 services:
+  # 1. SERVIÇO DE BANCO DE DATAS (PostgreSQL)
+  db:
+    image: postgres:15
+    container_name: db_contratos
+    restart: always
+    environment:
+      POSTGRES_USER: user_admin
+      POSTGRES_PASSWORD: senha_segura_123
+      POSTGRES_DB: contratos_db
+    volumes:
+      # Persiste os dados na sua máquina real (fora do container)
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # 2. SEU APLICATIVO FLET
   app:
     build: .
+    container_name: flet_app
+    restart: always
+    depends_on:
+      - db
     ports:
-      - "8550:8550"  
+      - "8080:8080" # Porta que definimos no main.py
     volumes:
-      - .:/app      
+      - .:/app
     environment:
-      - FLET_SERVER_PORT=8550
+      # Variáveis que o seu database.py vai ler para decidir qual banco usar
+      - DB_TYPE=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=contratos_db
+      - DB_USER=user_admin
+      - DB_PASS=senha_segura_123
+      # Garante que o Flet escute na porta correta no container
+      - FLET_SERVER_PORT=8080
       - FLET_SERVER_IP=0.0.0.0
+
+# Define o volume para o banco não resetar do zero toda vez
+volumes:
+  postgres_data:

@@ -1,4 +1,5 @@
 import flet as ft
+from app import database as db
 
 def carregar_login(page: ft.Page):
     page.views.clear()
@@ -19,12 +20,24 @@ def carregar_login(page: ft.Page):
     )
 
     def entrar_clique(e):
-    # Verifique se os valores batem exatamente com o que você digita
-        if txt_user.value == "admin" and txt_pass.value == "123": 
-            print("Login aceito, redirecionando...")
+        user = txt_user.value.strip().lower()
+        senha = txt_pass.value.strip()
+
+        # Chamada real ao banco de dados que criamos
+        resultado = db.verificar_login(user, senha)
+
+        if resultado["valido"]:
+            # SALVA NA SESSÃO - O "crachá" para o Main liberar a entrada
+            page.session.set("user_name", user)
+            page.session.set("is_admin", resultado["is_admin"])
+            
+            print(f"Login aceito para {user}, redirecionando...")
             page.go("/dashboard")
         else:
-            page.snack_bar = ft.SnackBar(ft.Text("Usuário ou senha incorretos!"), bgcolor="red")
+            page.snack_bar = ft.SnackBar(
+                ft.Text("Usuário ou senha incorretos!"), 
+                bgcolor="red"
+            )
             page.snack_bar.open = True
             page.update()
 
@@ -38,10 +51,7 @@ def carregar_login(page: ft.Page):
                             ft.Icon(ft.icons.LOCK_PERSON, size=80, color="blue"),
                             ft.Text("SISTEMA DE CONTRATOS", size=24, weight="bold"),
                             ft.Text("Faça login para continuar", color="grey"),
-                            
-                            # CORREÇÃO AQUI: Trocamos VerticalDivider por um Container vazio para dar o espaçamento
                             ft.Container(height=20), 
-                            
                             txt_user,
                             txt_pass,
                             ft.ElevatedButton(
