@@ -1,0 +1,31 @@
+services:
+  db-dev:
+    image: postgres:15-alpine
+    container_name: contratos-db-dev
+    environment:
+      POSTGRES_DB: contratos_dev
+      POSTGRES_USER: user_dev
+      POSTGRES_PASSWORD: password_dev
+    ports:
+      - "5433:5432"  
+    volumes:
+      - dev_data:/var/lib/postgresql/data
+
+  app-dev:
+    build: .
+    container_name: contratos-app-dev
+    depends_on:
+      - db-dev
+    environment:
+      - APP_USER=admin_dev
+      - APP_PASS=dev123
+      - DATABASE_URL=postgresql://user_dev:password_dev@db-dev:5432/contratos_dev
+    ports:
+      - "8502:8501"  # Acesse no seu navegador por localhost:8502
+    volumes:
+      - .:/app  # Monta sua pasta atual dentro do container
+    stdin_open: true
+    tty: true
+
+volumes:
+  dev_data:

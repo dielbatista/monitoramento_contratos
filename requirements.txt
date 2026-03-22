@@ -4,6 +4,7 @@ flet-desktop==0.25.2
 flet-web==0.25.2
 uvicorn==0.33.0
 fastapi==0.124.4
+reportlab
 
 # --- Banco de Dados e Migrações ---
 # psycopg2-binary é o driver para o PostgreSQL

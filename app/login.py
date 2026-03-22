@@ -4,36 +4,49 @@ from app import database as db
 def carregar_login(page: ft.Page):
     page.views.clear()
 
+    # --- CAMPOS DE ENTRADA ---
     txt_user = ft.TextField(
         label="Usuário", 
         border_radius=10, 
         width=300,
-        prefix_icon=ft.icons.PERSON
+        prefix_icon=ft.icons.PERSON,
+        on_submit=lambda _: entrar_clique(None) # Permite logar apertando Enter
     )
+    
     txt_pass = ft.TextField(
         label="Senha", 
         password=True, 
         can_reveal_password=True, 
         border_radius=10, 
         width=300,
-        prefix_icon=ft.icons.LOCK
+        prefix_icon=ft.icons.LOCK,
+        on_submit=lambda _: entrar_clique(None) # Permite logar apertando Enter
     )
 
+    # --- LÓGICA DE AUTENTICAÇÃO ---
     def entrar_clique(e):
-        user = txt_user.value.strip().lower()
+        # Mantém o valor original para o Case-Sensitive no banco de dados
+        user = txt_user.value.strip() 
         senha = txt_pass.value.strip()
 
-        # Chamada real ao banco de dados que criamos
+        if not user or not senha:
+            page.snack_bar = ft.SnackBar(ft.Text("Preencha todos os campos!"), bgcolor="orange")
+            page.snack_bar.open = True
+            page.update()
+            return
+
+        # Consulta o banco de dados (que já está configurado com COLLATE BINARY)
         resultado = db.verificar_login(user, senha)
 
         if resultado["valido"]:
-            # SALVA NA SESSÃO - O "crachá" para o Main liberar a entrada
+            # Armazena a sessão com o nome exatamente como digitado
             page.session.set("user_name", user)
             page.session.set("is_admin", resultado["is_admin"])
             
             print(f"Login aceito para {user}, redirecionando...")
             page.go("/dashboard")
         else:
+            # Feedback genérico de erro
             page.snack_bar = ft.SnackBar(
                 ft.Text("Usuário ou senha incorretos!"), 
                 bgcolor="red"
@@ -41,6 +54,7 @@ def carregar_login(page: ft.Page):
             page.snack_bar.open = True
             page.update()
 
+    # --- INTERFACE VISUAL ---
     page.views.append(
         ft.View(
             "/",
