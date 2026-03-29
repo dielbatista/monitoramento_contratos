@@ -5,56 +5,117 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 
 def gerar_pdf_contrato(contrato_dados, gastos_mensais):
-    # 1. Preparação do buffer em memória (Crucial para ambientes Docker)
+    """
+    Gera um relatório PDF detalhado incluindo Valor Inicial, Aditivos e Saldo Atual.
+    contrato_dados esperado: (id, empresa, n_contrato, data_fim, valor_total, valor_gasto_anterior, data_inicio, valor_aditivo)
+    """
+    # 1. Preparação do buffer em memória
     buffer = io.BytesIO()
     
-    # 2. Configuração do Canvas apontando para o buffer
+    # 2. Configuração do Canvas
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # --- Cabeçalho ---
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(50, height - 50, f"RELATÓRIO DE CONTRATO: {contrato_dados[1]}")
-    
-    c.setFont("Helvetica", 12)
-    c.drawString(50, height - 80, f"Nº Contrato: {contrato_dados[2]}")
-    c.drawString(50, height - 100, f"Vigência: {contrato_dados[6]} até {contrato_dados[3]}")
-
-    # --- Tabela de Resumo Financeiro ---
-    c.setFillColor(colors.whitesmoke)
-    c.rect(50, height - 180, 500, 60, fill=1)
-    c.setFillColor(colors.black)
-    
-    total = contrato_dados[4]
-    gasto_ant = contrato_dados[5]
-    gasto_atual = sum(gastos_mensais.values())
-    saldo = total - gasto_ant - gasto_atual
-
-    # Formatação de moeda para o PDF
+    # --- Utilitário de Formatação de Moeda ---
     def fmt(v): 
         return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-    c.drawString(60, height - 140, f"Valor Total: {fmt(total)}")
-    c.drawString(60, height - 160, f"Saldo Atual: {fmt(saldo)}")
+    # --- Extração de Dados ---
+    empresa = contrato_dados[1]
+    num_contrato = contrato_dados[2]
+    data_fim = contrato_dados[3]
+    valor_inicial = contrato_dados[4]
+    gasto_anterior = contrato_dados[5]
+    data_inicio = contrato_dados[6]
+    valor_aditivo = contrato_dados[7]
+    
+    # Cálculos Financeiros
+    total_gasto_atual = sum(gastos_mensais.values())
+    valor_global = valor_inicial + valor_aditivo
+    gasto_total_acumulado = gasto_anterior + total_gasto_atual
+    saldo_restante = valor_global - gasto_total_acumulado
+
+    # --- Cabeçalho ---
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, height - 50, f"RELATÓRIO DE CONTRATO: {empresa}")
+    
+    c.setFont("Helvetica", 11)
+    c.drawString(50, height - 75, f"Nº Contrato: {num_contrato}")
+    c.drawString(50, height - 90, f"Período de Vigência: {data_inicio} até {data_fim}")
+
+    # --- Quadro de Resumo Financeiro ---
+    # Aumentamos o retângulo para comportar as novas linhas de aditivo
+    c.setFillColor(colors.whitesmoke)
+    c.rect(50, height - 200, 500, 95, fill=1)
+    c.setFillColor(colors.black)
+    
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(65, height - 120, "RESUMO FINANCEIRO DO CONTRATO")
+    
+    c.setFont("Helvetica", 10)
+    c.drawString(65, height - 140, f"Valor Inicial: {fmt(valor_inicial)}")
+    
+    # Destaque para o Aditivo
+    c.setFillColor(colors.blue)
+    c.drawString(65, height - 155, f"(+) Aditivos Acumulados: {fmt(valor_aditivo)}")
+    
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(65, height - 170, f"(=) Valor Global Atualizado: {fmt(valor_global)}")
+    
+    c.setFont("Helvetica", 10)
+    c.drawString(65, height - 185, f"(-) Gasto Total (Anteriores + Atual): {fmt(gasto_total_acumulado)}")
+    
+    # Destaque para o Saldo (Verde se positivo, Vermelho se crítico)
+    if saldo_restante < 10000:
+        c.setFillColor(colors.red)
+    else:
+        c.setFillColor(colors.darkgreen)
+        
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(330, height - 185, f"SALDO DISPONÍVEL: {fmt(saldo_restante)}")
+    
+    c.setFillColor(colors.black)
 
     # --- Lista de Gastos Mensais ---
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, height - 210, "Detalhamento de Gastos Mensais (Ano Atual):")
+    c.drawString(50, height - 230, "Detalhamento de Gastos Mensais (Exercício Atual):")
     
-    y = height - 240
+    # Desenha uma linha divisória
+    c.setLineWidth(1)
+    c.line(50, height - 235, 550, height - 235)
+
+    y = height - 260
     c.setFont("Helvetica", 10)
-    meses_nomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+    meses_nomes = [
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ]
     
     for i, nome in enumerate(meses_nomes, 1):
         valor = gastos_mensais.get(i, 0.0)
-        c.drawString(70, y, f"{nome}: {fmt(valor)}")
+        
+        # Zebra nas linhas para facilitar leitura
+        if i % 2 == 0:
+            c.setFillColor(colors.whitesmoke)
+            c.rect(50, y - 5, 500, 15, fill=1)
+            c.setFillColor(colors.black)
+            
+        c.drawString(70, y, f"{nome}:")
+        c.drawRightString(530, y, fmt(valor))
         y -= 20
         
-        # Controle de nova página
-        if y < 50:
+        # Controle de nova página caso a lista cresça
+        if y < 60:
             c.showPage()
             y = height - 50
             c.setFont("Helvetica", 10)
+
+    # Rodapé com data de emissão
+    hoje = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    c.setFont("Helvetica-Oblique", 8)
+    c.setFillColor(colors.grey)
+    c.drawString(50, 30, f"Relatório gerado automaticamente pelo Sistema em: {hoje}")
 
     # Finaliza o PDF no buffer
     c.save()
@@ -63,11 +124,10 @@ def gerar_pdf_contrato(contrato_dados, gastos_mensais):
     pdf_bytes = buffer.getvalue()
     buffer.close()
     
-    # 4. Sanitização rigorosa do nome do arquivo
-    # Substitui qualquer caractere que não seja letra, número ou hífen por '_'
-    # Isso resolve o erro de "No such file" causado pela barra '/' do contrato
-    num_limpo = re.sub(r'[^\w\-]', '_', str(contrato_dados[2]))
-    nome_sugerido = f"relatorio_{num_limpo}.pdf"
+    # 4. Sanitização do nome do arquivo
+    num_limpo = re.sub(r'[^\w\-]', '_', str(num_contrato))
+    nome_sugerido = f"relatorio_contrato_{num_limpo}.pdf"
 
-    # Retorna os dados binários para o base64 e o nome para o navegador
+    from datetime import datetime # Import local para garantir o rodapé
+
     return pdf_bytes, nome_sugerido

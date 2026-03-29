@@ -8,14 +8,15 @@ def carregar_dashboard(page: ft.Page):
     user_name = page.session.get("user_name") or "Usuário"
     is_admin = db.verificar_se_admin(user_name)
 
+    # --- FUNÇÃO DE LOGOUT CORRIGIDA ---
+    def acao_logout(e):
+        page.session.clear() # Limpa os dados do usuário logado
+        page.views.clear()   # Limpa a pilha de telas
+        page.go("/")         # Redireciona para a raiz (login)
+
     # --- UTILITÁRIOS ---
     def formatar_moeda(valor):
         return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-    def limpar_valor_monetario(txt):
-        if not txt or str(txt).strip() == "": return "0.0"
-        res = txt.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
-        return res if res else "0.0"
 
     def calcular_status_vencimento(data_str):
         if not data_str: return {"cor": "grey", "label": "SEM DATA"}
@@ -46,7 +47,7 @@ def carregar_dashboard(page: ft.Page):
         if not new_user_login.value or not new_user_pass.value:
             page.snack_bar = ft.SnackBar(ft.Text("Preencha todos os campos!"), bgcolor="red")
         else:
-            sucesso = db.criar_usuario(new_user_login.value.lower(), new_user_pass.value, check_is_admin.value)
+            sucesso = db.criar_usuario(new_user_login.value.strip(), new_user_pass.value, check_is_admin.value)
             if sucesso:
                 page.snack_bar = ft.SnackBar(ft.Text(f"Usuário {new_user_login.value} criado!"), bgcolor="green")
                 modal_usuarios.open = False
@@ -75,6 +76,7 @@ def carregar_dashboard(page: ft.Page):
     def abrir_detalhes(d):
         detalhe_corpo.controls.clear()
         c_id, emp, num, venc, total_inicial, saldo_anterior, dt_inicio = d
+        
         gastos_db = db.obter_gastos(c_id)
         total_gasto_atual = sum(gastos_db.values())
         saldo_restante = total_inicial - saldo_anterior - total_gasto_atual
@@ -103,36 +105,31 @@ def carregar_dashboard(page: ft.Page):
             if i <= 6: col1.controls.append(campo)
             else: col2.controls.append(campo)
 
-        # --- LÓGICA DE GERAÇÃO E ABERTURA AUTOMÁTICA ---
         def acao_gerar_pdf(e):
             try:
                 from app.reports import gerar_pdf_contrato
-                
-                # Feedback visual imediato antes da computação
                 page.snack_bar = ft.SnackBar(ft.Text("Gerando relatório PDF..."), duration=2000)
                 page.snack_bar.open = True
                 page.update()
 
-                # Gera bytes em memória (evita erro de path no WSL)
                 pdf_bytes, _ = gerar_pdf_contrato(d, gastos_db)
-                
-                # Codificação para abertura direta no browser
                 pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
                 data_uri = f"data:application/pdf;base64,{pdf_base64}"
-                
                 page.launch_url(data_uri)
-
             except Exception as err:
-                page.snack_bar = ft.SnackBar(ft.Text(f"Erro: {err}"), bgcolor="red_800")
+                page.snack_bar = ft.SnackBar(ft.Text(f"Erro ao gerar PDF: {err}"), bgcolor="red_800")
                 page.snack_bar.open = True
             page.update()
 
         def acao_salvar(e):
             for idx, campo in campos_meses.items():
-                db.registrar_gasto(c_id, idx, float(limpar_valor_monetario(campo.value)))
+                db.registrar_gasto(c_id, idx, campo.value)
+            
             abrir_detalhes(d)
             atualizar_lista()
-            page.snack_bar = ft.SnackBar(ft.Text("Lançamentos salvos!"), bgcolor="green"); page.snack_bar.open = True; page.update()
+            page.snack_bar = ft.SnackBar(ft.Text("Lançamentos salvos com sucesso!"), bgcolor="green")
+            page.snack_bar.open = True
+            page.update()
 
         detalhe_corpo.controls = [
             header_financeiro,
@@ -141,22 +138,14 @@ def carregar_dashboard(page: ft.Page):
         ]
 
         modal_detalhes.actions = [
-            # Botão atualizado para Amarelo de alto contraste com ícone e texto brancos
-            ft.ElevatedButton(
-                "GERAR PDF", 
-                icon=ft.icons.PICTURE_AS_PDF, 
-                bgcolor=ft.colors.YELLOW_700, # Amarelo Escuro para visibilidade
-                color="white", # Texto Branco
-                on_click=acao_gerar_pdf
-            ),
-            # Botão de salvar gastos permanece o mesmo
+            ft.ElevatedButton("GERAR PDF", icon=ft.icons.PICTURE_AS_PDF, bgcolor=ft.colors.YELLOW_700, color="white", on_click=acao_gerar_pdf),
             ft.ElevatedButton("SALVAR GASTOS", icon=ft.icons.SAVE, bgcolor="green", color="white", on_click=acao_salvar),
             ft.TextButton("Fechar", on_click=lambda _: (setattr(modal_detalhes, "open", False), page.update()))
         ]
         modal_detalhes.open = True
         page.update()
 
-    # --- RESTANTE DO CÓDIGO (FORMULÁRIO E LISTA) ---
+    # --- FORMULÁRIO DE CADASTRO ---
     txt_empresa = ft.TextField(label="Empresa", border_radius=10)
     txt_num = ft.TextField(label="Nº Contrato", expand=True, border_radius=10)
     txt_data_inicio = ft.TextField(label="Início (DD-MM-AAAA)", expand=True, border_radius=10)
@@ -167,12 +156,21 @@ def carregar_dashboard(page: ft.Page):
 
     def salvar_novo(e):
         try:
-            db.adicionar_contrato(txt_empresa.value.upper(), txt_num.value, txt_venc.value, float(limpar_valor_monetario(txt_saldo_total.value)), float(limpar_valor_monetario(txt_saldo_anterior.value)), txt_data_inicio.value)
+            db.adicionar_contrato(
+                txt_empresa.value.upper(), 
+                txt_num.value, 
+                txt_venc.value, 
+                txt_saldo_total.value, 
+                txt_saldo_anterior.value, 
+                txt_data_inicio.value
+            )
             modal_add.open = False
             for f in [txt_empresa, txt_num, txt_data_inicio, txt_venc, txt_saldo_total, txt_saldo_anterior, txt_descricao]: f.value = ""
             atualizar_lista()
         except Exception as err:
-            page.snack_bar = ft.SnackBar(ft.Text(f"Erro: {err}"), bgcolor="red"); page.snack_bar.open = True; page.update()
+            page.snack_bar = ft.SnackBar(ft.Text(f"Erro ao cadastrar: {err}"), bgcolor="red")
+            page.snack_bar.open = True
+            page.update()
 
     modal_add = ft.AlertDialog(
         title=ft.Text("Cadastrar Novo Contrato"),
@@ -206,6 +204,7 @@ def carregar_dashboard(page: ft.Page):
             )
         page.update()
 
+    # --- BARRA SUPERIOR ---
     actions_row = ft.Row([
         ft.Icon(ft.icons.PERSON, color="blue_grey", size=20),
         ft.Text(f"Olá, {user_name.capitalize()}", weight="bold", color="blue_grey"),
@@ -215,11 +214,12 @@ def carregar_dashboard(page: ft.Page):
     if is_admin:
         actions_row.controls.insert(2, ft.IconButton(ft.icons.SETTINGS, tooltip="Gerenciar Usuários", on_click=lambda _: (setattr(modal_usuarios, "open", True), page.update())))
 
-    actions_row.controls.append(ft.IconButton(ft.icons.LOGOUT, on_click=lambda _: page.go("/"), icon_color="red_400"))
+    # MUDANÇA AQUI: Chamando a nova função acao_logout
+    actions_row.controls.append(ft.IconButton(ft.icons.LOGOUT, on_click=acao_logout, icon_color="red_400"))
 
     page.views.append(
         ft.View("/dashboard", [
-            ft.AppBar(title=ft.Text("Gestão de Contratos"), center_title=False, bgcolor="white", actions=[actions_row]),
+            ft.AppBar(title=ft.Text("Monitoramento de Contratos"), center_title=False, bgcolor="white", actions=[actions_row]),
             lista_view,
             ft.FloatingActionButton(content=ft.Icon(ft.icons.ADD, color="white"), on_click=lambda _: (setattr(modal_add, "open", True), page.update()), bgcolor="blue")
         ], bgcolor="#F0F2F5")

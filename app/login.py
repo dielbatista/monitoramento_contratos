@@ -2,6 +2,9 @@ import flet as ft
 from app import database as db
 
 def carregar_login(page: ft.Page):
+    # Sempre que carregar a tela de login, garantimos que a sessão está limpa
+    # Isso resolve o problema de tentar deslogar e o Flet te manter logado
+    page.session.clear()
     page.views.clear()
 
     # --- CAMPOS DE ENTRADA ---
@@ -10,7 +13,7 @@ def carregar_login(page: ft.Page):
         border_radius=10, 
         width=300,
         prefix_icon=ft.icons.PERSON,
-        on_submit=lambda _: entrar_clique(None) # Permite logar apertando Enter
+        on_submit=lambda _: entrar_clique(None)
     )
     
     txt_pass = ft.TextField(
@@ -20,12 +23,11 @@ def carregar_login(page: ft.Page):
         border_radius=10, 
         width=300,
         prefix_icon=ft.icons.LOCK,
-        on_submit=lambda _: entrar_clique(None) # Permite logar apertando Enter
+        on_submit=lambda _: entrar_clique(None)
     )
 
     # --- LÓGICA DE AUTENTICAÇÃO ---
     def entrar_clique(e):
-        # Mantém o valor original para o Case-Sensitive no banco de dados
         user = txt_user.value.strip() 
         senha = txt_pass.value.strip()
 
@@ -35,18 +37,16 @@ def carregar_login(page: ft.Page):
             page.update()
             return
 
-        # Consulta o banco de dados (que já está configurado com COLLATE BINARY)
         resultado = db.verificar_login(user, senha)
 
         if resultado["valido"]:
-            # Armazena a sessão com o nome exatamente como digitado
+            # Define a sessão
             page.session.set("user_name", user)
             page.session.set("is_admin", resultado["is_admin"])
             
             print(f"Login aceito para {user}, redirecionando...")
             page.go("/dashboard")
         else:
-            # Feedback genérico de erro
             page.snack_bar = ft.SnackBar(
                 ft.Text("Usuário ou senha incorretos!"), 
                 bgcolor="red"

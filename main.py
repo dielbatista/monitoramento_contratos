@@ -2,59 +2,76 @@ import flet as ft
 from app import database as db
 from app.login import carregar_login
 from app.dashboard import carregar_dashboard
-import time
 
 def main(page: ft.Page):
-    # 1. INICIALIZAÇÃO DO BANCO (Com tratamento de erro para Docker)
+    # 1. INICIALIZAÇÃO DO BANCO
     try:
-        print("Tentando conectar ao banco de dados...")
         db.inicializar_db() 
-        print("Banco de dados inicializado com sucesso!")
     except Exception as e:
-        print(f"ERRO CRÍTICO NA INICIALIZAÇÃO DO BANCO: {e}")
-        # Em ambiente Docker, se o banco falhar, mostramos o erro no log e paramos
+        print(f"ERRO CRÍTICO NO BANCO: {e}")
+        page.add(ft.Text(f"Erro ao conectar ao banco: {e}", color="red"))
         return
 
     # 2. CONFIGURAÇÕES DA PÁGINA
-    page.title = "Sistema de Gestão de Contratos - NoPaper"
+    page.title = "Sistema de Monitoramento de Contratos"
     page.theme_mode = ft.ThemeMode.LIGHT
-    
-    # Responsividade básica para o navegador
-    page.window.width = 1200
-    page.window.height = 800
-    
-    # 3. GERENCIADOR DE ROTAS
+    page.padding = 0
+    page.spacing = 0
+    page.window_width = 1200
+    page.window_height = 800
+
+    # 3. GERENCIADOR DE ROTAS (Lógica de Proteção)
     def route_change(e):
-        # Limpa as views atuais para evitar sobreposição visual
+        # Limpa as views para evitar sobreposição
         page.views.clear()
         
-        if page.route == "/":
-            carregar_login(page)
-            
-        elif page.route == "/dashboard":
-            # SEGURANÇA: Verifica se o usuário está logado na sessão
-            if not page.session.get("user_name"):
-                print("Acesso negado: Usuário não logado. Redirecionando...")
+        # Recupera o usuário da sessão
+        user = page.session.get("user_name")
+        
+        # --- Lógica de Roteamento ---
+
+        # NOVA ROTA DE LOGOUT: Limpa tudo e vai para a raiz
+        if page.route == "/logout":
+            page.session.clear()
+            page.views.clear()
+            page.go("/")
+            return
+
+        # Se tentar acessar o Dashboard
+        if page.route == "/dashboard":
+            if not user:
+                # Se não houver login, redireciona para a raiz
                 page.go("/")
+                return 
             else:
                 carregar_dashboard(page)
         
+        # Rota de Login (Raiz)
+        elif page.route == "/" or page.route == "" or page.route is None:
+            if user:
+                # Se já estiver logado, manda pro dashboard
+                page.go("/dashboard")
+                return
+            carregar_login(page)
+            
         page.update()
 
+    def view_pop(e):
+        if len(page.views) > 1:
+            page.views.pop()
+            top_view = page.views[-1]
+            page.go(top_view.route)
+
     page.on_route_change = route_change
-    
-    # 4. INICIALIZAÇÃO DE ROTA
-    # Garante que sempre comece no login se não houver rota definida
-    if page.route == "/":
-        page.go("/")
-    else:
-        # Se for um refresh no /dashboard, o route_change valida a sessão
-        page.go(page.route)
+    page.on_view_pop = view_pop
+
+    # 4. DISPARO INICIAL
+    page.go(page.route)
 
 if __name__ == "__main__":
     ft.app(
         target=main, 
         view=ft.AppView.WEB_BROWSER, 
-        port=8501,       
+        port=8080,      
         host="0.0.0.0"   
     )
