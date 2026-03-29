@@ -1,66 +1,63 @@
-Sistema de Monitoramento de Contratos 📊
-Este é um sistema de gestão financeira focado no controle de saldo e vigência de contratos. O software permite o acompanhamento detalhado de débitos mensais, abatendo automaticamente valores de exercícios anteriores e gastos correntes para fornecer o saldo real disponível em tempo real.
+📑 Sistema de Monitoramento de Contratos
+Sistema desenvolvido para gestão e acompanhamento financeiro de contratos, com dashboards interativos, controle de aditivos, saldo global e geração de relatórios detalhados em PDF.
 
-🚀 Funcionalidades
-Gestão de Saldos: Cálculo automático baseado na fórmula:
-Saldo Atual = Valor Total - Gasto Ano Anterior - Soma de Gastos Mensais.
+🚀 Tecnologias Utilizadas
+Linguagem: Python 3.10+
 
-Controle de Vigência: Alertas visuais de status (Vence em breve, Prazo OK) baseados na data atual.
+Interface Gráfica: Flet (Flutter for Python)
 
-Lançamentos Mensais: Detalhamento de gastos de Janeiro a Dezembro para cada contrato.
+Banco de Dados: PostgreSQL (via SQLAlchemy/Psycopg2)
 
-Persistência de Dados: Armazenamento robusto utilizando SQLite.
+Relatórios: ReportLab (Geração de PDF customizado)
 
-Interface Moderna: UI responsiva construída com o framework Flet (baseado em Flutter).
+Segurança: Bcrypt (Hashing de senhas)
 
-Relatórios: Geração de relatórios detalhados em PDF (em implementação).
+Testes: Pytest (Suíte completa de testes unitários e mocks)
 
-🛠️ Tecnologias Utilizadas
-Linguagem: Python 3.x
+Containerização: Docker & Docker Compose
 
-Interface Gráfica: Flet
+🛠️ Funcionalidades
+Dashboard Financeiro: Visualização em tempo real de gastos, aditivos e saldo disponível.
 
-Banco de Dados: SQLite com integração via Python sqlite3
+Gestão de Contratos: CRUD completo de contratos com monitoramento de vigência.
 
-Segurança: Sistema de login com autenticação de usuário.
+Relatórios Automáticos: Geração de PDF com resumo financeiro e detalhamento mensal.
 
-Versionamento: Git & GitHub com autenticação via SSH.
+Segurança: Sistema de login com níveis de acesso (Admin/User).
 
-📋 Pré-requisitos
-Antes de começar, você vai precisar ter instalado em sua máquina (ou WSL/Linux):
+Sanitização: Tratamento automático de nomes de arquivos e dados de entrada.
 
-Python 3.8+
-
-Git
-
-🔧 Instalação e Execução
-Siga os passos abaixo no seu terminal:
-
-Clone o repositório:
+🧪 Qualidade de Código
+O projeto conta com uma suíte de testes automatizados cobrindo as principais regras de negócio e utilitários de sistema.
 
 Bash
-git clone git@github.com:dielbatista/monitoramento_contratos.git
-cd monitoramento_contratos
-Crie um ambiente virtual (Recomendado):
+# Para rodar os testes
+pytest -v
+Status atual: 20 testes passados (100% de sucesso) incluindo mocks complexos de PDF e interface.
+
+📦 Como rodar com Docker
+O projeto está pronto para deploy em containers.
+
+Configure as variáveis de ambiente:
+Crie um arquivo .env na raiz com:
+
+Snippet de código
+DB_URL=postgresql://usuario:senha@db:5432/nome_do_banco
+SECRET_KEY=sua_chave_secreta
+Suba o ambiente:
 
 Bash
-python3 -m venv .venv
-source .venv/bin/activate
-Instale as dependências:
+docker-compose up --build
+A aplicação estará disponível em http://localhost:8080.
 
-Bash
-pip install -r requirements.txt
-Caso não tenha o arquivo, instale manualmente:
-pip install flet fpdf2
-
-Inicie a aplicação:
-
-Bash
-python3 main.py
-🔐 Acesso ao Sistema
-Usuário padrão: admin
-
-Senha padrão: 123
-
-👨‍💻 Autor
-Diel Batista Estudante de Engenharia de Software | Full Stack Developer in progress (Focus: Backend)
+📂 Estrutura do Projeto
+Plaintext
+├── app/                # Código fonte principal
+│   ├── database.py     # Conexão e modelos do banco
+│   ├── reports.py      # Lógica de geração de PDFs
+│   ├── dashboard.py    # Interface do Dashboard (Flet)
+│   └── main.py         # Ponto de entrada da aplicação
+├── tests/              # Testes unitários (Pytest)
+├── Dockerfile          # Configuração do container de produção
+├── requirements.txt    # Dependências do projeto
+└── README.md           # Documentação

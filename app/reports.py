@@ -1,5 +1,6 @@
 import re
 import io
+from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
@@ -20,14 +21,14 @@ def gerar_pdf_contrato(contrato_dados, gastos_mensais):
     def fmt(v): 
         return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-    # --- Extração de Dados ---
+    # --- Extração de Dados (8 elementos conforme sua nova lógica) ---
     empresa = contrato_dados[1]
     num_contrato = contrato_dados[2]
     data_fim = contrato_dados[3]
     valor_inicial = contrato_dados[4]
     gasto_anterior = contrato_dados[5]
     data_inicio = contrato_dados[6]
-    valor_aditivo = contrato_dados[7]
+    valor_aditivo = contrato_dados[7] # Novo campo
     
     # Cálculos Financeiros
     total_gasto_atual = sum(gastos_mensais.values())
@@ -44,7 +45,6 @@ def gerar_pdf_contrato(contrato_dados, gastos_mensais):
     c.drawString(50, height - 90, f"Período de Vigência: {data_inicio} até {data_fim}")
 
     # --- Quadro de Resumo Financeiro ---
-    # Aumentamos o retângulo para comportar as novas linhas de aditivo
     c.setFillColor(colors.whitesmoke)
     c.rect(50, height - 200, 500, 95, fill=1)
     c.setFillColor(colors.black)
@@ -66,7 +66,7 @@ def gerar_pdf_contrato(contrato_dados, gastos_mensais):
     c.setFont("Helvetica", 10)
     c.drawString(65, height - 185, f"(-) Gasto Total (Anteriores + Atual): {fmt(gasto_total_acumulado)}")
     
-    # Destaque para o Saldo (Verde se positivo, Vermelho se crítico)
+    # Destaque para o Saldo
     if saldo_restante < 10000:
         c.setFillColor(colors.red)
     else:
@@ -79,13 +79,11 @@ def gerar_pdf_contrato(contrato_dados, gastos_mensais):
 
     # --- Lista de Gastos Mensais ---
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, height - 230, "Detalhamento de Gastos Mensais (Exercício Atual):")
-    
-    # Desenha uma linha divisória
-    c.setLineWidth(1)
-    c.line(50, height - 235, 550, height - 235)
+    y_lista = height - 230
+    c.drawString(50, y_lista, "Detalhamento de Gastos Mensais (Exercício Atual):")
+    c.line(50, y_lista - 5, 550, y_lista - 5)
 
-    y = height - 260
+    y = y_lista - 30
     c.setFont("Helvetica", 10)
     meses_nomes = [
         "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
@@ -94,8 +92,6 @@ def gerar_pdf_contrato(contrato_dados, gastos_mensais):
     
     for i, nome in enumerate(meses_nomes, 1):
         valor = gastos_mensais.get(i, 0.0)
-        
-        # Zebra nas linhas para facilitar leitura
         if i % 2 == 0:
             c.setFillColor(colors.whitesmoke)
             c.rect(50, y - 5, 500, 15, fill=1)
@@ -105,29 +101,17 @@ def gerar_pdf_contrato(contrato_dados, gastos_mensais):
         c.drawRightString(530, y, fmt(valor))
         y -= 20
         
-        # Controle de nova página caso a lista cresça
-        if y < 60:
-            c.showPage()
-            y = height - 50
-            c.setFont("Helvetica", 10)
-
-    # Rodapé com data de emissão
+    # Rodapé
     hoje = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     c.setFont("Helvetica-Oblique", 8)
     c.setFillColor(colors.grey)
-    c.drawString(50, 30, f"Relatório gerado automaticamente pelo Sistema em: {hoje}")
+    c.drawString(50, 30, f"Relatório gerado em: {hoje}")
 
-    # Finaliza o PDF no buffer
     c.save()
-    
-    # 3. Recupera os bytes e limpa o buffer
     pdf_bytes = buffer.getvalue()
     buffer.close()
     
-    # 4. Sanitização do nome do arquivo
     num_limpo = re.sub(r'[^\w\-]', '_', str(num_contrato))
     nome_sugerido = f"relatorio_contrato_{num_limpo}.pdf"
-
-    from datetime import datetime # Import local para garantir o rodapé
 
     return pdf_bytes, nome_sugerido

@@ -12,7 +12,7 @@ def carregar_login(page: ft.Page):
         label="Usuário", 
         border_radius=10, 
         width=300,
-        prefix_icon=ft.icons.PERSON,
+        prefix_icon=ft.Icons.PERSON,
         on_submit=lambda _: entrar_clique(None)
     )
     
@@ -22,7 +22,7 @@ def carregar_login(page: ft.Page):
         can_reveal_password=True, 
         border_radius=10, 
         width=300,
-        prefix_icon=ft.icons.LOCK,
+        prefix_icon=ft.Icons.LOCK,
         on_submit=lambda _: entrar_clique(None)
     )
 
@@ -62,7 +62,7 @@ def carregar_login(page: ft.Page):
                 ft.Container(
                     content=ft.Column(
                         [
-                            ft.Icon(ft.icons.LOCK_PERSON, size=80, color="blue"),
+                            ft.Icon(ft.Icons.LOCK_PERSON, size=80, color="blue"),
                             ft.Text("SISTEMA DE CONTRATOS", size=24, weight="bold"),
                             ft.Text("Faça login para continuar", color="grey"),
                             ft.Container(height=20), 

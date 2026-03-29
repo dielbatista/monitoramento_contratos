@@ -1,87 +1,125 @@
 import sys
+import os
+import pytest
 from unittest.mock import MagicMock
 
-# --- MOCK DO PSYCOPG2 ---
+# --- MOCKS DE SISTEMA ---
 if 'psycopg2' not in sys.modules:
     sys.modules['psycopg2'] = MagicMock()
     sys.modules['psycopg2.extras'] = MagicMock()
 
-import pytest
-from datetime import date, datetime, timedelta
-# Importamos apenas o que queremos testar (lógica interna)
-# Como as funções estão dentro de 'carregar_dashboard', vamos extrair a lógica
+# Mock do módulo de relatórios para evitar erros de importação de PDF
+sys.modules['app.reports'] = MagicMock()
+
+from app import database as db
 from app.dashboard import carregar_dashboard
+import flet as ft
 
-# Mock da página Flet para não quebrar o import
+# --- MOCK DA PÁGINA ---
+class MockPage:
+    def __init__(self):
+        self.views = []
+        self.overlay = []
+        self.session = MagicMock()
+        self.snack_bar = None
+        self.route = "/dashboard"
+        self.theme_mode = None
+        self.title = ""
+        self.window_width = 0
+        self.window_height = 0
+        self.padding = 0
+        self.spacing = 0
+    
+    def update(self):
+        pass
+
+    def go(self, route):
+        self.route = route
+
+    def launch_url(self, url):
+        self.url_lancada = url
+
 @pytest.fixture
-def mock_page():
-    page = MagicMock()
-    page.session.get.return_value = "Diel"
-    page.overlay = []
-    return page
-
-# --- TESTES DE UTILITÁRIOS ---
-
-def test_formatar_moeda():
-    """Valida se R$ 1.000,00 é formatado corretamente com padrão brasileiro."""
-    # Como a função está dentro de carregar_dashboard, precisamos de um truque 
-    # ou testar os valores via mock. Mas vamos validar a lógica que você escreveu:
-    def formatar(valor):
-        return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+def page(monkeypatch):
+    # Força ambiente de teste
+    monkeypatch.setenv("DB_TYPE", "sqlite")
     
-    assert formatar(1000) == "R$ 1.000,00"
-    assert formatar(1500.50) == "R$ 1.500,50"
-    assert formatar(0) == "R$ 0,00"
+    p = MockPage()
+    # Mock padrão de sessão
+    p.session.get.return_value = "Diel"
+    return p
 
-def test_limpar_valor_monetario():
-    """Valida se a limpeza de strings de dinheiro para float funciona."""
-    def limpar(txt):
-        if not txt or str(txt).strip() == "": return "0.0"
-        res = txt.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
-        return res
+# --- TESTES ---
+
+def test_carregamento_dashboard_basico(page, monkeypatch):
+    """Verifica se o dashboard renderiza a view e busca contratos."""
+    # Mock do banco para retornar uma lista vazia e não quebrar o loop
+    monkeypatch.setattr(db, "listar_contratos", lambda: [])
+    monkeypatch.setattr(db, "verificar_se_admin", lambda u: True)
+
+    carregar_dashboard(page)
     
-    assert float(limpar("R$ 1.250,50")) == 1250.50
-    assert float(limpar("1.000,00")) == 1000.00
-    assert float(limpar("")) == 0.0
+    # Verifica se a View do dashboard foi adicionada
+    assert len(page.views) > 0
+    assert page.views[-1].route == "/dashboard"
 
-# --- TESTES DE STATUS (LOGICA DE NEGÓCIO) ---
-
-def test_calcular_status_vencimento():
-    """Valida as cores do semáforo de datas."""
-    def calcular(data_str):
-        hoje = date.today()
-        # Simulação simplificada da sua lógica
-        venc = datetime.strptime(data_str, "%d-%m-%Y").date()
-        dias = (venc - hoje).days
-        if dias <= 30: return "red"
-        elif 30 < dias <= 60: return "orange"
-        else: return "green"
-
-    hoje_str = date.today().strftime("%d-%m-%Y")
-    proximo_mes = (date.today() + timedelta(days=20)).strftime("%d-%m-%Y")
-    longe_str = (date.today() + timedelta(days=90)).strftime("%d-%m-%Y")
-
-    assert calcular(proximo_mes) == "red"      # Vence em breve
-    assert calcular(longe_str) == "green"      # Prazo OK
-
-def test_calcular_status_saldo():
-    """Valida se o saldo crítico (< 25k) acende o alerta vermelho."""
-    def calcular(saldo):
-        if saldo <= 25000: return "red"
-        return "green" if saldo > 50000 else "orange"
-
-    assert calcular(10000) == "red"    # Crítico
-    assert calcular(35000) == "orange" # Baixo
-    assert calcular(60000) == "green"  # OK
-
-def test_calculo_financeiro_detalhes(mock_page):
-    """Valida a conta: Saldo = Total - Anterior - Gastos_Mensais"""
-    total_inicial = 100000.0
-    saldo_anterior = 20000.0
-    gastos_mensais = {1: 5000.0, 2: 5000.0} # Total gasto 10k
+def test_calculo_status_vencimento(page, monkeypatch):
+    """Testa a lógica interna de cores de vencimento (indireto via renderização)"""
+    from datetime import date, timedelta
     
-    # Saldo restante deve ser 70.000,00
-    total_gasto_atual = sum(gastos_mensais.values())
-    saldo_restante = total_inicial - saldo_anterior - total_gasto_atual
+    # Cria uma data para daqui a 10 dias (deve ser RED - Vence em breve)
+    data_vencimento = (date.today() + timedelta(days=10)).strftime("%d-%m-%Y")
     
-    assert saldo_restante == 70000.0
+    # Mock de um contrato específico
+    contrato_fake = [(1, "EMPRESA TESTE", "001", data_vencimento, 1000.0, 0, "01-01-2024")]
+    monkeypatch.setattr(db, "listar_contratos", lambda: contrato_fake)
+    monkeypatch.setattr(db, "obter_gastos", lambda id: {})
+    
+    carregar_dashboard(page)
+    
+    # A lista_view deve ter 1 controle (o container do contrato)
+    # O primeiro controle do View é o AppBar, o segundo é a lista_view
+    lista_view = page.views[-1].controls[1]
+    card_contrato = lista_view.controls[0]
+    
+    # Verifica se a borda esquerda é vermelha (red) conforme lógica de < 30 dias
+    assert card_contrato.border.left.color == "red"
+
+def test_logout_limpa_sessao(page, monkeypatch):
+    """Verifica se a função de logout limpa os dados e redireciona"""
+    monkeypatch.setattr(db, "listar_contratos", lambda: [])
+    carregar_dashboard(page)
+    
+    # Captura a função de logout do AppBar
+    app_bar = page.views[-1].controls[0]
+    # O botão de logout é o último controle da actions_row (que é o último da AppBar)
+    btn_logout = app_bar.actions[0].controls[-1]
+    
+    # Executa o clique de logout
+    btn_logout.on_click(None)
+    
+    # Verifica se limpou a sessão e mudou a rota
+    page.session.clear.assert_called()
+    assert page.route == "/"
+
+def test_restricao_admin_settings(page, monkeypatch):
+    """Verifica se o ícone de configurações só aparece para Admins"""
+    # 1. Caso NÃO ADMIN
+    monkeypatch.setattr(db, "verificar_se_admin", lambda u: False)
+    monkeypatch.setattr(db, "listar_contratos", lambda: [])
+    
+    carregar_dashboard(page)
+    actions_row = page.views[-1].controls[0].actions[0]
+    
+    # Procura o ícone SETTINGS nos controles
+    icones = [c.icon for c in actions_row.controls if hasattr(c, 'icon')]
+    assert ft.Icons.SETTINGS not in icones
+
+    # 2. Caso ADMIN
+    page.views.clear()
+    monkeypatch.setattr(db, "verificar_se_admin", lambda u: True)
+    
+    carregar_dashboard(page)
+    actions_row = page.views[-1].controls[0].actions[0]
+    icones_admin = [c.icon for c in actions_row.controls if hasattr(c, 'icon')]
+    assert ft.Icons.SETTINGS in icones_admin
