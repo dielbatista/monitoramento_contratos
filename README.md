@@ -49,15 +49,3 @@ Suba o ambiente:
 Bash
 docker-compose up --build
 A aplicação estará disponível em http://localhost:8080.
-
-📂 Estrutura do Projeto
-Plaintext
-├── app/                # Código fonte principal
-│   ├── database.py     # Conexão e modelos do banco
-│   ├── reports.py      # Lógica de geração de PDFs
-│   ├── dashboard.py    # Interface do Dashboard (Flet)
-│   └── main.py         # Ponto de entrada da aplicação
-├── tests/              # Testes unitários (Pytest)
-├── Dockerfile          # Configuração do container de produção
-├── requirements.txt    # Dependências do projeto
-└── README.md           # Documentação
