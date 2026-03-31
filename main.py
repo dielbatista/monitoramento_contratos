@@ -72,6 +72,6 @@ if __name__ == "__main__":
     ft.app(
         target=main, 
         view=ft.AppView.WEB_BROWSER, 
-        port=8080,      
+        port=8501,      
         host="0.0.0.0"   
     )
